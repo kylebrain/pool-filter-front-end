@@ -16,13 +16,6 @@ interface PoolTimer
     winter_duration: string
 }
 
-interface CurrentTimer
-{
-    speed: number,
-    start: string,
-    end: string
-}
-
 const SERVER_NAME = 'http://192.168.4.32:5000';
 
 const TimerList : React.FC = () => {
@@ -70,15 +63,99 @@ const TimerList : React.FC = () => {
     }
 }
 
-const CurrentSpeed : React.FC = () => {
+interface CurrentTimer
+{
+    speed: number,
+    start: string,
+    end: string
+}
+
+interface DashboardInfo
+{
+    timer: CurrentTimer | null,
+    error: {message:string} | null
+}
+
+const CurrentSpeed : React.FC<{info : DashboardInfo}> = ({info}) => {    
+    if (info.error) {
+        return <Text>Error: {info.error.message}</Text>;
+    } else if (info.timer != null) {
+        if(info.timer.speed == 0)
+        {
+            return (
+                <View style={{justifyContent: 'center', alignItems: 'center'}}>
+                    <Text>OFF</Text>
+                    <Text>Next Timer: {moment(info.timer.end, 'HH:mm:ss').format('h:mma')} </Text>
+                </View>
+            );
+        
+        } else {
+            return (
+                <View style={{justifyContent: 'center', alignItems: 'center'}}>
+                    <Text>Speed: {info.timer.speed}</Text>
+                    <Text>Started: {moment(info.timer.start, 'HH:mm:ss').format('h:mma')}, Next Timer: {moment(info.timer.end, 'HH:mm:ss').format('h:mma')}</Text>
+                </View>
+            );
+        }
+    } else {
+        return <Text>Error loading current timer (logic error)</Text>
+    }
+}
+
+const Override : React.FC<{onSet: (speed: number) => void, onStop: () => void}> = ({onSet, onStop}) =>
+{
+    return(
+        <View>
+            <Button onPress={() => onSet(2)}><Text>Set Speed 2</Text></Button>
+            <Button onPress={() => onStop()}><Text>Stop</Text></Button>
+        </View>
+    );
+}
+
+const App : React.FC = () => {
+
+    let [fontsLoaded] = useFonts({
+        Roboto: require('native-base/Fonts/Roboto.ttf'),
+        Roboto_medium: require('native-base/Fonts/Roboto_medium.ttf'),
+        ...Ionicons.font,
+        });
+
+    const handleSet = (speed: number) => {
+        fetch(SERVER_NAME + "/override?speed=" + speed.toString() + "&duration=00:00:20", {method: "PUT"})
+            .then(res => res.json())
+            .then(
+                (result) =>
+                {
+                    console.log(result.message)
+                    setDash(true);
+                },
+                (error) => {
+                    console.error("Override error: " + error.message)
+                }
+            )
+    }
+
+    const handleStop = () => {
+        fetch(SERVER_NAME + "/override?speed=0", {method: "PUT"})
+            .then(res => res.json())
+            .then(
+                (result) =>
+                {
+                    console.log(result.message)
+                    setDash(true);
+                },
+                (error) => {
+                    console.error("Override error: " + error.message)
+                }
+            )
+    }
+
     const [error, setError] = useState<{message:string} | null>(null);
     const [isLoaded, setIsLoaded] = useState(false);
     const [timer, setTimer] = useState<CurrentTimer | null>(null);
+    const [reloadDash, setDash] = useState(true);
 
-    // Note: the empty deps array [] means
-    // this useEffect will run once
-    // similar to componentDidMount()
-    useEffect(() => {
+    const getCurrentProgram = () => {
         fetch(SERVER_NAME + "/program/now")
             .then(res => res.json())
             .then(
@@ -94,43 +171,23 @@ const CurrentSpeed : React.FC = () => {
                     setError(error);
                 }
             )
-    }, [])
-
-    
-    if (error) {
-        return <Text>Error: {error.message}</Text>;
-    } else if (!isLoaded) {
-        return <AppLoading/>
-    } else if (timer != null) {
-        if(timer.speed == 0)
-        {
-            return (
-                <View style={{justifyContent: 'center', alignItems: 'center'}}>
-                    <Text>OFF</Text>
-                    <Text>Next Timer: {moment(timer.end, 'HH:mm:ss').format('h:mma')} </Text>
-                </View>
-            );
-        
-        } else {
-            return (
-                <View style={{justifyContent: 'center', alignItems: 'center'}}>
-                    <Text>Speed: {timer.speed}</Text>
-                    <Text>Started: {timer.start}, Next Timer: {timer.end}</Text>
-                </View>
-            );
-        }
-    } else {
-        return <Text>Error loading current timer (logic error)</Text>
     }
-}
 
-const App : React.FC = () => {
-
-    let [fontsLoaded] = useFonts({
-        Roboto: require('native-base/Fonts/Roboto.ttf'),
-        Roboto_medium: require('native-base/Fonts/Roboto_medium.ttf'),
-        ...Ionicons.font,
-        });    
+    // Note: the empty deps array [] means
+    // this useEffect will run once
+    // similar to componentDidMount()
+    // TODO: Learn how all of this works and come back with a better designed solution
+        // Reload the current program everytime the api updates
+            // Seems like there is a delay when writing to the DB
+                // Add a delay in the FRONT-END requests
+                // OR BACK-END: Make sure the DB has been properly updated before sending a response
+    useEffect(() => {
+        if(reloadDash)
+        {
+            getCurrentProgram()
+            setDash(false)
+        }
+    }, [reloadDash])
 
     if (!fontsLoaded) {
         return <AppLoading />;
@@ -152,10 +209,10 @@ const App : React.FC = () => {
                     <Tab heading="Dashboard">
                         <View style={{flex: 1, margin: 10}}>
                             <View style={{margin: 10, alignSelf: 'stretch', justifyContent: 'center', alignItems: 'center'}}>
-                                <CurrentSpeed/>
+                                <CurrentSpeed info={{timer:timer, error:error}}/>
                             </View>
                             <View style={{margin: 10, alignSelf: 'stretch'}}>
-                                <Text>Override</Text>
+                                <Override onSet={handleSet} onStop={handleStop}/>
                             </View>
                         </View>
                     </Tab>
