@@ -6,111 +6,12 @@ import { Container, Header, Title, Content, Footer, FooterTab, Button, Left, Rig
 import * as Font from 'expo-font';
 import { Ionicons } from '@expo/vector-icons';
 import moment from 'moment';
+import { useFetch } from './useFetch';
+import { Override } from './Override';
+import { TimerList } from './TimerList';
+import { CurrentSpeed, CurrentTimer } from './CurrentSpeed';
 
-interface PoolTimer
-{
-    id: number,
-    speed: number,
-    start: string,
-    summer_duration: string,
-    winter_duration: string
-}
-
-const SERVER_NAME = 'http://192.168.4.32:5000';
-
-const TimerList : React.FC = () => {
-    const [error, setError] = useState<{message:string} | null>(null);
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [items, setItems] = useState<PoolTimer[]>([]);
-
-    // Note: the empty deps array [] means
-    // this useEffect will run once
-    // similar to componentDidMount()
-    useEffect(() => {
-        fetch(SERVER_NAME + "/program/all")
-            .then(res => res.json())
-            .then(
-                (result) => {
-                    setIsLoaded(true);
-                    setItems(result);
-                },
-                // Note: it's important to handle errors here
-                // instead of a catch() block so that we don't swallow
-                // exceptions from actual bugs in components.
-                (error) => {
-                    setIsLoaded(true);
-                    setError(error);
-                }
-            )
-    }, [])
-
-    
-    if (error) {
-        return <Text>Error: {error.message}</Text>;
-    } else if (!isLoaded) {
-        return <AppLoading/>
-    } else {
-        return (
-            <List>
-                {items.map(item =>
-                    <ListItem key={item.id.toString()}>
-                        <Text>
-                            Speed: {item.speed} - {moment(item.start, 'HH:mm:ss').format('h:mma')}
-                        </Text>
-                    </ListItem>)}
-            </List>
-        );
-    }
-}
-
-interface CurrentTimer
-{
-    speed: number,
-    start: string,
-    end: string
-}
-
-interface DashboardInfo
-{
-    timer: CurrentTimer | null,
-    error: {message:string} | null
-}
-
-const CurrentSpeed : React.FC<{info : DashboardInfo}> = ({info}) => {    
-    if (info.error) {
-        return <Text>Error: {info.error.message}</Text>;
-    } else if (info.timer != null) {
-        if(info.timer.speed == 0)
-        {
-            return (
-                <View style={{justifyContent: 'center', alignItems: 'center'}}>
-                    <Text>OFF</Text>
-                    <Text>Next Timer: {moment(info.timer.end, 'HH:mm:ss').format('h:mma')} </Text>
-                </View>
-            );
-        
-        } else {
-            return (
-                <View style={{justifyContent: 'center', alignItems: 'center'}}>
-                    <Text>Speed: {info.timer.speed}</Text>
-                    <Text>Started: {moment(info.timer.start, 'HH:mm:ss').format('h:mma')}, Next Timer: {moment(info.timer.end, 'HH:mm:ss').format('h:mma')}</Text>
-                </View>
-            );
-        }
-    } else {
-        return <Text>Error loading current timer (logic error)</Text>
-    }
-}
-
-const Override : React.FC<{onSet: (speed: number) => void, onStop: () => void}> = ({onSet, onStop}) =>
-{
-    return(
-        <View>
-            <Button onPress={() => onSet(2)}><Text>Set Speed 2</Text></Button>
-            <Button onPress={() => onStop()}><Text>Stop</Text></Button>
-        </View>
-    );
-}
+export const SERVER_NAME = 'http://192.168.4.32:5000';
 
 const App : React.FC = () => {
 
@@ -120,6 +21,8 @@ const App : React.FC = () => {
         ...Ionicons.font,
         });
 
+    const [timer, isLoaded, error, reload] = useFetch<CurrentTimer>(SERVER_NAME + "/program/now")
+
     const handleSet = (speed: number) => {
         fetch(SERVER_NAME + "/override?speed=" + speed.toString() + "&duration=00:00:20", {method: "PUT"})
             .then(res => res.json())
@@ -127,7 +30,8 @@ const App : React.FC = () => {
                 (result) =>
                 {
                     console.log(result.message)
-                    setDash(true);
+                    // API should change the speed before serving
+                    setTimeout(() => reload(), 1000)
                 },
                 (error) => {
                     console.error("Override error: " + error.message)
@@ -142,52 +46,14 @@ const App : React.FC = () => {
                 (result) =>
                 {
                     console.log(result.message)
-                    setDash(true);
+                    // API should change the speed before serving
+                    setTimeout(() => reload(), 1000)
                 },
                 (error) => {
                     console.error("Override error: " + error.message)
                 }
             )
     }
-
-    const [error, setError] = useState<{message:string} | null>(null);
-    const [isLoaded, setIsLoaded] = useState(false);
-    const [timer, setTimer] = useState<CurrentTimer | null>(null);
-    const [reloadDash, setDash] = useState(true);
-
-    const getCurrentProgram = () => {
-        fetch(SERVER_NAME + "/program/now")
-            .then(res => res.json())
-            .then(
-                (result) => {
-                    setIsLoaded(true);
-                    setTimer(result);
-                },
-                // Note: it's important to handle errors here
-                // instead of a catch() block so that we don't swallow
-                // exceptions from actual bugs in components.
-                (error) => {
-                    setIsLoaded(true);
-                    setError(error);
-                }
-            )
-    }
-
-    // Note: the empty deps array [] means
-    // this useEffect will run once
-    // similar to componentDidMount()
-    // TODO: Learn how all of this works and come back with a better designed solution
-        // Reload the current program everytime the api updates
-            // Seems like there is a delay when writing to the DB
-                // Add a delay in the FRONT-END requests
-                // OR BACK-END: Make sure the DB has been properly updated before sending a response
-    useEffect(() => {
-        if(reloadDash)
-        {
-            getCurrentProgram()
-            setDash(false)
-        }
-    }, [reloadDash])
 
     if (!fontsLoaded) {
         return <AppLoading />;
@@ -209,7 +75,7 @@ const App : React.FC = () => {
                     <Tab heading="Dashboard">
                         <View style={{flex: 1, margin: 10}}>
                             <View style={{margin: 10, alignSelf: 'stretch', justifyContent: 'center', alignItems: 'center'}}>
-                                <CurrentSpeed info={{timer:timer, error:error}}/>
+                                {isLoaded && <CurrentSpeed info={{timer:timer, error:error}}/>}
                             </View>
                             <View style={{margin: 10, alignSelf: 'stretch'}}>
                                 <Override onSet={handleSet} onStop={handleStop}/>
