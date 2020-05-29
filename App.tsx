@@ -11,7 +11,7 @@ import { Override } from './Override';
 import { TimerList } from './TimerList';
 import { CurrentSpeed, CurrentTimer } from './CurrentSpeed';
 
-export const SERVER_NAME = 'http://192.168.4.32:5000';
+export const SERVER_NAME = 'http://192.168.1.11:5000';
 
 const App : React.FC = () => {
 
@@ -23,6 +23,11 @@ const App : React.FC = () => {
 
     const [timer, isLoaded, error, reload] = useFetch<CurrentTimer>(SERVER_NAME + "/program/now")
 
+    useEffect(() => {
+        const interval = setInterval(() => reload(), 1000);
+        return () => clearInterval(interval);
+    }, []);
+
     const handleSet = (speed: number) => {
         fetch(SERVER_NAME + "/override?speed=" + speed.toString() + "&duration=00:00:20", {method: "PUT"})
             .then(res => res.json())
@@ -31,7 +36,7 @@ const App : React.FC = () => {
                 {
                     console.log(result.message)
                     // API should change the speed before serving
-                    setTimeout(() => reload(), 1000)
+                    //setTimeout(() => reload(), 1000)
                 },
                 (error) => {
                     console.error("Override error: " + error.message)
@@ -47,7 +52,7 @@ const App : React.FC = () => {
                 {
                     console.log(result.message)
                     // API should change the speed before serving
-                    setTimeout(() => reload(), 1000)
+                    //setTimeout(() => reload(), 1000)
                 },
                 (error) => {
                     console.error("Override error: " + error.message)
