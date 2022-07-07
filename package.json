@@ -13,7 +13,7 @@
     "@use-expo/font": "^2.0.0",
     "expo": "~37.0.3",
     "expo-font": "~8.1.0",
-    "moment": "^2.26.0",
+    "moment": "^2.29.4",
     "native-base": "^2.13.12",
     "react": "~16.9.0",
     "react-dom": "~16.9.0",
